@@ -27,19 +27,32 @@ export default function RegisterPage() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const res = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orgType, orgName, city, categories, name, email, password }),
-    });
-    const data = await res.json();
-    setLoading(false);
-    if (!res.ok) {
-      setError(typeof data.error === "string" ? data.error : "Revisa los datos ingresados");
-      return;
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgType, orgName, city, categories, name, email, password }),
+      });
+
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch {
+        setError("El servidor no respondió correctamente. Intenta de nuevo en unos segundos.");
+        return;
+      }
+
+      if (!res.ok) {
+        setError(typeof data.error === "string" ? data.error : "Revisa los datos ingresados");
+        return;
+      }
+      router.push(data.redirectTo);
+      router.refresh();
+    } catch {
+      setError("No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.");
+    } finally {
+      setLoading(false);
     }
-    router.push(data.redirectTo);
-    router.refresh();
   }
 
   return (

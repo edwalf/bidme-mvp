@@ -16,19 +16,34 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await res.json();
-    setLoading(false);
-    if (!res.ok) {
-      setError(data.error || "No se pudo iniciar sesión");
-      return;
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch {
+        // El servidor respondió algo que no es JSON (ej. error 500 sin body,
+        // timeout, o la base de datos aún no tiene las tablas migradas).
+        setError("El servidor no respondió correctamente. Intenta de nuevo en unos segundos.");
+        return;
+      }
+
+      if (!res.ok) {
+        setError(data.error || "No se pudo iniciar sesión");
+        return;
+      }
+      router.push(data.redirectTo);
+      router.refresh();
+    } catch {
+      setError("No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.");
+    } finally {
+      setLoading(false);
     }
-    router.push(data.redirectTo);
-    router.refresh();
   }
 
   return (
