@@ -1,0 +1,108 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrgType {
+  BUYER
+  SUPPLIER
+  BOTH
+}
+
+enum RfqStatus {
+  DRAFT
+  MATCHING
+  PUBLISHED
+  CLOSED
+  CANCELLED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model Organization {
+  id           String   @id @default(cuid())
+  name         String
+  type         OrgType
+  city         String?
+  categories   String[] // solo relevante si type incluye SUPPLIER
+  verified     Boolean  @default(false)
+  users        User[]
+  rfqs         Rfq[]           @relation("BuyerRfqs")
+  invitations  Invitation[]
+  proposals    Proposal[]
+  matchScores  MatchScore[]
+  createdAt    DateTime @default(now())
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String
+  name         String
+  role         String       @default("OWNER")
+  orgId        String
+  org          Organization @relation(fields: [orgId], references: [id])
+  createdAt    DateTime     @default(now())
+}
+
+model Rfq {
+  id           String       @id @default(cuid())
+  buyerOrgId   String
+  buyerOrg     Organization @relation("BuyerRfqs", fields: [buyerOrgId], references: [id])
+  title        String
+  description  String
+  category     String
+  city         String
+  deadline     DateTime
+  budget       Float?
+  requirements String?
+  status       RfqStatus    @default(DRAFT)
+  invitations  Invitation[]
+  matchScores  MatchScore[]
+  createdAt    DateTime     @default(now())
+}
+
+// Score interno calculado por el motor de matching. NUNCA se expone al comprador.
+model MatchScore {
+  id             String       @id @default(cuid())
+  rfqId          String
+  rfq            Rfq          @relation(fields: [rfqId], references: [id])
+  supplierOrgId  String
+  supplierOrg    Organization @relation(fields: [supplierOrgId], references: [id])
+  score          Float
+  breakdown      Json
+  createdAt      DateTime     @default(now())
+}
+
+model Invitation {
+  id             String            @id @default(cuid())
+  rfqId          String
+  rfq            Rfq               @relation(fields: [rfqId], references: [id])
+  supplierOrgId  String
+  supplierOrg    Organization      @relation(fields: [supplierOrgId], references: [id])
+  status         InvitationStatus  @default(PENDING)
+  proposal       Proposal?
+  invitedAt      DateTime          @default(now())
+}
+
+model Proposal {
+  id            String       @id @default(cuid())
+  invitationId  String       @unique
+  invitation    Invitation   @relation(fields: [invitationId], references: [id])
+  supplierOrgId String
+  supplierOrg   Organization @relation(fields: [supplierOrgId], references: [id])
+  price         Float
+  deliveryTime  String
+  warranty      String
+  comments      String?
+  submittedAt   DateTime     @default(now())
+}
