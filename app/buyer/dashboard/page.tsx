@@ -100,6 +100,10 @@ export default async function BuyerDashboard() {
                         <Link href="/buyer/requests/new" className="text-[#C9A227] font-medium text-[12.5px]">
                           Continuar
                         </Link>
+                      ) : r.status === "MATCHING" ? (
+                        <Link href={`/buyer/requests/${r.id}/matching`} className="text-[#C9A227] font-medium text-[12.5px]">
+                          Revisar matching
+                        </Link>
                       ) : (
                         <Link href={`/buyer/requests/${r.id}/compare`} className="text-[#C9A227] font-medium text-[12.5px]">
                           Ver comparador

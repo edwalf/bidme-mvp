@@ -115,10 +115,89 @@ con un proveedor o comprador piloto.
   `verified: false` para proveedores automáticamente, pero no hay panel de
   admin para aprobarlos — se puede cambiar manualmente en Prisma Studio
   mientras tanto).
-- Notificaciones por correo al generarse una invitación (Resend, ~30 min de trabajo).
 - Mensajería privada comprador↔proveedor (no incluida en este alcance).
-- Adjudicación de ganador y cierre del RFQ.
 - Rate limiting y protección CSRF adicional en los endpoints de auth.
+- Adjuntos de archivos reales (requiere S3 — el campo existe pero no sube nada).
+- Exportar PDF del comparador (el botón está pero no hace nada todavía).
+
+## 6.1 Adjudicación de ganador (nuevo)
+
+El comprador ahora puede elegir un ganador directamente desde el comparador
+(`/buyer/requests/:id/compare`) — botón **Adjudicar** en la fila de cada
+propuesta, con confirmación antes de ejecutar.
+
+Al confirmar:
+- El RFQ pasa a estado `CLOSED` (ya no se puede volver a adjudicar).
+- La invitación ganadora queda marcada `WON`, todas las demás `LOST`.
+- Se dispara un correo al ganador (felicitándolo) y uno a cada proveedor que
+  no ganó ("el proceso finalizó, gracias por participar") — **sin revelar el
+  precio ganador ni la identidad de los demás participantes**, consistente
+  con la regla de confidencialidad del producto.
+- El proveedor ve el resultado reflejado en `/supplier/invitations` con un
+  badge "🏆 Ganaste" o "Proceso finalizado".
+
+## 6.2 Notificaciones por correo (nuevo)
+
+Implementado con [Resend](https://resend.com). Se envía correo automáticamente en tres momentos:
+
+1. **Nueva invitación** — al proveedor, justo cuando el motor de matching lo selecciona (dentro de `runMatchingEngine`).
+2. **Nueva propuesta recibida** — al comprador, cuando un proveedor envía su cotización.
+3. **Resultado de adjudicación** — al ganador y a los no ganadores, cuando el comprador adjudica.
+
+### Para activarlo
+
+1. Crea cuenta gratis en [resend.com](https://resend.com)
+2. Copia tu API key → variable de entorno `RESEND_API_KEY`
+3. Para producción real necesitas verificar un dominio propio en Resend y
+   usar `RESEND_FROM_EMAIL="BidMe <notificaciones@tudominio.com>"`. **Mientras
+   no verifiques un dominio**, Resend en modo de prueba solo entrega correos
+   a la dirección con la que creaste la cuenta — los demás destinatarios no
+   recibirán nada aunque el log diga que se envió. Esto es una limitación de
+   Resend, no un bug del código.
+4. Si `RESEND_API_KEY` no está configurada, la app **no falla** — simplemente
+   registra en consola qué correo habría enviado y a quién, útil para
+   desarrollo local sin cuenta de Resend.
+
+### Importante: nueva migración de base de datos
+
+Estos cambios agregan un campo (`Invitation.result`) al schema. Antes de
+desplegar, corre localmente (igual que la primera vez):
+
+```bash
+DATABASE_URL="tu_url_de_railway" npx prisma migrate dev --name add_award_and_notifications
+```
+
+Esto crea la migración **y** la aplica contra tu base de Railway en un solo
+paso. Súbela a GitHub junto con el resto del código para que quede
+documentada en el repo.
+
+## 6.3 Smart Matching Engine (nuevo — corazón del producto)
+
+El flujo de publicación ahora es: **crear RFQ → Smart Matching corre automáticamente → pantalla de resultados → "Invitar automáticamente"**.
+
+### Qué hace
+- Al publicar, calcula un **Match Score (0-100)** para cada proveedor activo, considerando: categoría (peso 35), subcategoría (15), cobertura geográfica ciudad > departamento > nacional (20), rating histórico (10), Premium (10), Verificado (10). Pesos configurables en `lib/matching.ts` (`WEIGHTS`).
+- Clasifica en **coincidencia alta / media / baja** (umbrales en `TIERS`).
+- Pantalla de resultados con tarjetas (no tablas), badges Premium/Verificado, filtros (Solo Premium, Solo Verificados, Ciudad, Departamento, Nacional, Score 80+), y preselección automática de coincidencias altas y medias.
+- Botón **"Invitar automáticamente"**: crea las invitaciones (guardando `matchScore`, `matchReason` e `invitedAutomatically` en cada una), publica el RFQ y dispara los correos.
+- Regla dura en base de datos: `@@unique([rfqId, supplierOrgId])` — imposible invitar dos veces al mismo proveedor para el mismo RFQ.
+- El modelo ya tiene los campos de historial preparados (`responseRate`, `averageResponseHours`, `awardedContracts`, `rating`) — el cálculo automático llega en V2 sin cambiar el algoritmo.
+
+### Arquitectura
+Toda la lógica vive en `lib/matching.ts` con cuatro funciones limpias:
+`calculateSupplierScore()` (puro, testeable) → `findBestSuppliers()` → `executeMatching()` → `createAutomaticInvitations()`. Los componentes React solo consumen resultados vía API.
+
+### Pasos para aplicar estos cambios
+
+1. **Nueva migración** (el schema cambió bastante):
+   ```bash
+   DATABASE_URL="tu_url_de_railway" npx prisma migrate dev --name smart_matching_engine
+   ```
+2. **Bootstrap de proveedores demo** — genera ~30 proveedores de demostración distribuidos por categoría, ciudad, con ratings y badges variados, para que el matching sea demostrable desde el primer día:
+   ```bash
+   DATABASE_URL="tu_url_de_railway" npm run bootstrap
+   ```
+   Es idempotente (si ya existen, los salta). Los proveedores demo son registros reales en la base — el algoritmo no distingue demo de real, así que al llegar proveedores reales no hay que tocar la lógica. Login de cualquier demo: `demo@<nombresinespacios>.gt` / `demo1234`.
 
 ## 7. Siguiente escalón (cuando ya validaste el flujo)
 

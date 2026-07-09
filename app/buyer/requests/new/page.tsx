@@ -6,6 +6,17 @@ import { ChevronRight, Check, Paperclip, Calendar, Radar, Sparkles, Lock } from 
 
 const CATEGORIES = ["Tecnología", "SAP", "Ciberseguridad", "Construcción", "Transporte", "Mantenimiento", "Limpieza", "Seguridad"];
 
+const SUBCATEGORIES: Record<string, string[]> = {
+  "Tecnología": ["Computadoras", "Redes", "Software", "Impresión"],
+  "SAP": ["Implementación", "Soporte", "Licenciamiento"],
+  "Ciberseguridad": ["Perimetral", "Auditoría", "SOC"],
+  "Construcción": ["Obra civil", "Remodelación", "Eléctrica"],
+  "Transporte": ["Carga", "Personal", "Última milla"],
+  "Mantenimiento": ["Industrial", "Edificios", "Aires acondicionados"],
+  "Limpieza": ["Oficinas", "Industrial"],
+  "Seguridad": ["Física", "Monitoreo", "Escoltas"],
+};
+
 type MatchingPhase = "idle" | "publishing" | "matching" | "done" | "error";
 
 export default function NewRequestPage() {
@@ -16,13 +27,14 @@ export default function NewRequestPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
+  const [subCategory, setSubCategory] = useState("");
   const [city, setCity] = useState("");
   const [deadline, setDeadline] = useState("");
   const [budget, setBudget] = useState("");
   const [requirements, setRequirements] = useState("");
 
   const [phase, setPhase] = useState<MatchingPhase>("idle");
-  const [invitedCount, setInvitedCount] = useState<number | null>(null);
+
   const [error, setError] = useState<string | null>(null);
   const [rfqId, setRfqId] = useState<string | null>(null);
 
@@ -30,37 +42,44 @@ export default function NewRequestPage() {
     setError(null);
     setPhase("publishing");
 
-    const createRes = await fetch("/api/rfqs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title,
-        description,
-        category,
-        city,
-        deadline: new Date(deadline).toISOString(),
-        budget: budget ? Number(budget) : undefined,
-        requirements: requirements || undefined,
-      }),
-    });
-    const rfq = await createRes.json();
-    if (!createRes.ok) {
-      setError("No se pudo crear la solicitud. Revisa los campos.");
-      setPhase("error");
-      return;
-    }
-    setRfqId(rfq.id);
-    setPhase("matching");
+    try {
+      const createRes = await fetch("/api/rfqs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          description,
+          category,
+          subCategory: subCategory || undefined,
+          city,
+          deadline: new Date(deadline).toISOString(),
+          budget: budget ? Number(budget) : undefined,
+          requirements: requirements || undefined,
+        }),
+      });
+      const rfq = await createRes.json();
+      if (!createRes.ok) {
+        setError("No se pudo crear la solicitud. Revisa los campos.");
+        setPhase("error");
+        return;
+      }
+      setRfqId(rfq.id);
+      setPhase("matching");
 
-    const publishRes = await fetch(`/api/rfqs/${rfq.id}/publish`, { method: "POST" });
-    const result = await publishRes.json();
-    if (!publishRes.ok) {
-      setError(result.error || "No se pudo publicar la solicitud.");
+      const publishRes = await fetch(`/api/rfqs/${rfq.id}/publish`, { method: "POST" });
+      const result = await publishRes.json();
+      if (!publishRes.ok) {
+        setError(result.error || "No se pudo publicar la solicitud.");
+        setPhase("error");
+        return;
+      }
+      // El Smart Matching ya corrió — llevar al comprador a la pantalla
+      // de resultados para revisar e invitar automáticamente.
+      router.push(result.redirectTo || `/buyer/requests/${rfq.id}/matching`);
+    } catch {
+      setError("No se pudo conectar con el servidor.");
       setPhase("error");
-      return;
     }
-    setInvitedCount(result.invitedCount);
-    setPhase("done");
   }
 
   if (phase === "publishing" || phase === "matching") {
@@ -74,30 +93,6 @@ export default function NewRequestPage() {
           <div className="text-[12.5px] text-gray-400 mt-1.5 max-w-xs">
             BidMe está evaluando categoría, cobertura y verificación de cada proveedor.
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (phase === "done") {
-    return (
-      <div className="px-8 py-6 max-w-3xl">
-        <div className="rounded-xl border border-gray-200 bg-white p-10 flex flex-col items-center text-center">
-          <div className="h-14 w-14 rounded-full bg-emerald-50 flex items-center justify-center mb-4">
-            <Sparkles size={22} className="text-emerald-500" />
-          </div>
-          <div className="text-[15px] font-medium text-gray-900">
-            Enviado a {invitedCount} proveedor{invitedCount === 1 ? "" : "es"} calificado{invitedCount === 1 ? "" : "s"}
-          </div>
-          <div className="text-[12.5px] text-gray-400 mt-1.5 max-w-sm">
-            BidMe seleccionó automáticamente a los proveedores con mejor puntuación para esta categoría y ciudad. Te avisaremos cuando respondan.
-          </div>
-          <button
-            onClick={() => router.push("/buyer/dashboard")}
-            className="mt-5 text-[12.5px] font-medium text-[#C9A227] border border-[#C9A227]/30 rounded-lg px-3.5 py-1.5 hover:bg-[#C9A227]/5"
-          >
-            Ver solicitud en el dashboard
-          </button>
         </div>
       </div>
     );
@@ -159,9 +154,24 @@ export default function NewRequestPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-[12.5px] font-medium text-gray-700">Categoría</label>
-                <select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2 text-[13.5px] bg-white">
+                <select
+                  value={category}
+                  onChange={(e) => { setCategory(e.target.value); setSubCategory(""); }}
+                  className="mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2 text-[13.5px] bg-white"
+                >
                   {CATEGORIES.map((c) => (
                     <option key={c}>{c}</option>
+                  ))}
+                </select>
+                <label className="text-[12.5px] font-medium text-gray-700 block mt-3">Subcategoría (opcional)</label>
+                <select
+                  value={subCategory}
+                  onChange={(e) => setSubCategory(e.target.value)}
+                  className="mt-1.5 w-full border border-gray-200 rounded-lg px-3 py-2 text-[13.5px] bg-white"
+                >
+                  <option value="">— Sin especificar —</option>
+                  {(SUBCATEGORIES[category] || []).map((s) => (
+                    <option key={s}>{s}</option>
                   ))}
                 </select>
               </div>

@@ -28,13 +28,35 @@ enum InvitationStatus {
   REJECTED
 }
 
+enum InvitationResult {
+  PENDING
+  WON
+  LOST
+}
+
 model Organization {
   id           String   @id @default(cuid())
   name         String
   type         OrgType
   city         String?
-  categories   String[] // solo relevante si type incluye SUPPLIER
-  verified     Boolean  @default(false)
+  categories   String[] // legado, se mantiene por compatibilidad
+
+  // --- Perfil de proveedor para Smart Matching ---
+  mainCategory        String?
+  subCategory         String?
+  coverageCity        String?
+  coverageDepartment  String?
+  coverageNational    Boolean  @default(false)
+  isPremium           Boolean  @default(false)
+  verified            Boolean  @default(false)
+  active              Boolean  @default(true)
+
+  // --- Historial (estructura preparada; el cálculo llega en V2) ---
+  responseRate         Float?   // % de invitaciones que responde
+  averageResponseHours Float?   // horas promedio para cotizar
+  awardedContracts     Int      @default(0)
+  rating               Float?   // 0-5, promedio de evaluaciones
+
   users        User[]
   rfqs         Rfq[]           @relation("BuyerRfqs")
   invitations  Invitation[]
@@ -61,26 +83,35 @@ model Rfq {
   title        String
   description  String
   category     String
+  subCategory  String?
   city         String
   deadline     DateTime
   budget       Float?
   requirements String?
   status       RfqStatus    @default(DRAFT)
+
+  // --- Smart Matching metadata ---
+  matchedSuppliers    Int?      // cuántos proveedores compatibles encontró
+  matchingExecutedAt  DateTime?
+  matchingVersion     String?   // ej. "v1" — permite evolucionar el algoritmo con trazabilidad
+
   invitations  Invitation[]
   matchScores  MatchScore[]
   createdAt    DateTime     @default(now())
 }
 
-// Score interno calculado por el motor de matching. NUNCA se expone al comprador.
+// Score calculado por el Smart Matching Engine para cada proveedor evaluado.
 model MatchScore {
   id             String       @id @default(cuid())
   rfqId          String
   rfq            Rfq          @relation(fields: [rfqId], references: [id])
   supplierOrgId  String
   supplierOrg    Organization @relation(fields: [supplierOrgId], references: [id])
-  score          Float
+  score          Float        // 0-100
   breakdown      Json
   createdAt      DateTime     @default(now())
+
+  @@unique([rfqId, supplierOrgId]) // evita duplicados si el matching se re-ejecuta
 }
 
 model Invitation {
@@ -90,8 +121,17 @@ model Invitation {
   supplierOrgId  String
   supplierOrg    Organization      @relation(fields: [supplierOrgId], references: [id])
   status         InvitationStatus  @default(PENDING)
+  result         InvitationResult  @default(PENDING)
+
+  // --- Smart Matching metadata ---
+  matchScore           Float?
+  matchReason          String?  // ej. "Categoría exacta · Misma ciudad · Verificado"
+  invitedAutomatically Boolean  @default(true)
+
   proposal       Proposal?
   invitedAt      DateTime          @default(now())
+
+  @@unique([rfqId, supplierOrgId]) // regla: nunca invitar dos veces al mismo proveedor para el mismo RFQ
 }
 
 model Proposal {

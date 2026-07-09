@@ -36,25 +36,33 @@ export default async function SupplierInvitationsPage() {
             Aún no has recibido invitaciones. Te notificaremos en cuanto BidMe identifique una solicitud compatible con tu perfil.
           </div>
         )}
-        {invitations.map((inv) => (
-          <Link
-            key={inv.id}
-            href={`/supplier/invitations/${inv.id}`}
-            className="block rounded-xl border border-gray-200 bg-white p-4 hover:shadow-sm transition-shadow duration-150"
-          >
-            <div className="flex items-center justify-between">
-              <div className="font-medium text-gray-900 text-[13.5px]">{inv.rfq.title}</div>
-              <span className={`text-[11px] px-2 py-0.5 rounded-full border ${STATUS_STYLES[inv.status]}`}>
-                {STATUS_LABELS[inv.status]}
-              </span>
-            </div>
-            <div className="flex items-center gap-4 mt-2 text-[12px] text-gray-500">
-              <span className="flex items-center gap-1"><MapPin size={11} /> {inv.rfq.city}</span>
-              <span className="flex items-center gap-1"><Calendar size={11} /> {new Date(inv.rfq.deadline).toLocaleDateString("es-GT")}</span>
-              <span>{inv.rfq.category}</span>
-            </div>
-          </Link>
-        ))}
+        {invitations.map((inv) => {
+          const badge =
+            inv.result === "WON"
+              ? { style: "bg-[#C9A227]/10 text-[#0F1B2E] border-[#C9A227]/40", label: "🏆 Ganaste" }
+              : inv.result === "LOST"
+              ? { style: "bg-gray-100 text-gray-400 border-gray-200", label: "Proceso finalizado" }
+              : { style: STATUS_STYLES[inv.status], label: STATUS_LABELS[inv.status] };
+          return (
+            <Link
+              key={inv.id}
+              href={`/supplier/invitations/${inv.id}`}
+              className="block rounded-xl border border-gray-200 bg-white p-4 hover:shadow-sm transition-shadow duration-150"
+            >
+              <div className="flex items-center justify-between">
+                <div className="font-medium text-gray-900 text-[13.5px]">{inv.rfq.title}</div>
+                <span className={`text-[11px] px-2 py-0.5 rounded-full border ${badge.style}`}>
+                  {badge.label}
+                </span>
+              </div>
+              <div className="flex items-center gap-4 mt-2 text-[12px] text-gray-500">
+                <span className="flex items-center gap-1"><MapPin size={11} /> {inv.rfq.city}</span>
+                <span className="flex items-center gap-1"><Calendar size={11} /> {new Date(inv.rfq.deadline).toLocaleDateString("es-GT")}</span>
+                <span>{inv.rfq.category}</span>
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

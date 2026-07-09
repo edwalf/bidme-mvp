@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
+import { notifyProposalReceived } from "@/lib/email";
 import { z } from "zod";
 
 const createProposalSchema = z.object({
@@ -28,6 +29,10 @@ export async function POST(req: NextRequest) {
 
   const invitation = await prisma.invitation.findUnique({
     where: { id: parsed.data.invitationId },
+    include: {
+      rfq: { include: { buyerOrg: { include: { users: { take: 1 } } } } },
+      supplierOrg: true,
+    },
   });
   if (!invitation || invitation.supplierOrgId !== session.orgId) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
@@ -49,5 +54,17 @@ export async function POST(req: NextRequest) {
       comments: parsed.data.comments,
     },
   });
+
+  const buyerUser = invitation.rfq.buyerOrg.users[0];
+  if (buyerUser) {
+    await notifyProposalReceived({
+      buyerEmail: buyerUser.email,
+      rfqTitle: invitation.rfq.title,
+      supplierOrgName: invitation.supplierOrg.name,
+      rfqId: invitation.rfqId,
+      appUrl: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+    });
+  }
+
   return NextResponse.json(proposal, { status: 201 });
 }

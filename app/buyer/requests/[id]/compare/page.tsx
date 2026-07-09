@@ -1,7 +1,8 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { Lock, Check, Download } from "lucide-react";
+import { Lock, Check, Download, Trophy } from "lucide-react";
+import { AwardButton } from "@/components/AwardButton";
 
 export default async function ComparePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -20,6 +21,8 @@ export default async function ComparePage({ params }: { params: Promise<{ id: st
   });
 
   const withProposal = invitations.filter((i) => i.proposal);
+  const isClosed = rfq.status === "CLOSED";
+  const winner = invitations.find((i) => i.result === "WON");
 
   return (
     <div>
@@ -40,6 +43,15 @@ export default async function ComparePage({ params }: { params: Promise<{ id: st
           </button>
         </div>
 
+        {isClosed && winner && (
+          <div className="rounded-lg bg-[#C9A227]/10 border border-[#C9A227]/30 px-4 py-3 mb-4 flex items-center gap-2">
+            <Trophy size={15} className="text-[#C9A227]" />
+            <span className="text-[13px] text-[#0F1B2E]">
+              Adjudicado a <strong>{winner.supplierOrg.name}</strong>. Los demás proveedores fueron notificados de que el proceso finalizó, sin conocer el precio ganador.
+            </span>
+          </div>
+        )}
+
         <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
           {withProposal.length === 0 ? (
             <div className="px-5 py-10 text-center text-[13px] text-gray-400">
@@ -53,22 +65,38 @@ export default async function ComparePage({ params }: { params: Promise<{ id: st
                   <th className="px-5 py-2.5 font-medium">Precio</th>
                   <th className="px-5 py-2.5 font-medium">Tiempo de entrega</th>
                   <th className="px-5 py-2.5 font-medium">Garantía</th>
+                  <th className="px-5 py-2.5 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
-                {withProposal.map((inv) => (
-                  <tr key={inv.id} className="border-t border-gray-50 hover:bg-gray-50/60 transition-colors duration-150">
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900">{inv.supplierOrg.name}</span>
-                        {inv.supplierOrg.verified && <Check size={12} className="text-emerald-500" />}
-                      </div>
-                    </td>
-                    <td className="px-5 py-3 font-medium text-gray-900">${inv.proposal!.price.toLocaleString()}</td>
-                    <td className="px-5 py-3 text-gray-600">{inv.proposal!.deliveryTime}</td>
-                    <td className="px-5 py-3 text-gray-600">{inv.proposal!.warranty}</td>
-                  </tr>
-                ))}
+                {withProposal.map((inv) => {
+                  const isWinner = inv.result === "WON";
+                  const isLoser = inv.result === "LOST";
+                  return (
+                    <tr
+                      key={inv.id}
+                      className={`border-t border-gray-50 transition-colors duration-150 ${
+                        isWinner ? "bg-[#C9A227]/5" : "hover:bg-gray-50/60"
+                      } ${isLoser ? "opacity-50" : ""}`}
+                    >
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-2">
+                          {isWinner && <Trophy size={13} className="text-[#C9A227]" />}
+                          <span className="font-medium text-gray-900">{inv.supplierOrg.name}</span>
+                          {inv.supplierOrg.verified && <Check size={12} className="text-emerald-500" />}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 font-medium text-gray-900">${inv.proposal!.price.toLocaleString()}</td>
+                      <td className="px-5 py-3 text-gray-600">{inv.proposal!.deliveryTime}</td>
+                      <td className="px-5 py-3 text-gray-600">{inv.proposal!.warranty}</td>
+                      <td className="px-5 py-3 text-right">
+                        {!isClosed && (
+                          <AwardButton rfqId={rfq.id} invitationId={inv.id} supplierName={inv.supplierOrg.name} />
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
