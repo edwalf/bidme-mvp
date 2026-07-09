@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Radar, Sparkles, Check, Crown, MapPin, Globe } from "lucide-react";
+import { Radar, Sparkles, Check, Crown, MapPin, Globe, Lock } from "lucide-react";
 
 interface MatchedSupplier {
   id: string;
@@ -36,7 +36,6 @@ const TIER_LABELS = { HIGH: "Alta", MEDIUM: "Media", LOW: "Baja" };
 export function MatchingResults({ rfqId }: { rfqId: string }) {
   const router = useRouter();
   const [data, setData] = useState<MatchingData | null>(null);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<Filter>("ALL");
   const [error, setError] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
@@ -52,14 +51,6 @@ export function MatchingResults({ rfqId }: { rfqId: string }) {
           return;
         }
         setData(json);
-        // preselección: coincidencia alta y media
-        setSelected(
-          new Set(
-            json.suppliers
-              .filter((s: MatchedSupplier) => s.tier !== "LOW")
-              .map((s: MatchedSupplier) => s.id)
-          )
-        );
       } catch {
         setError("No se pudo conectar con el servidor.");
       }
@@ -81,17 +72,9 @@ export function MatchingResults({ rfqId }: { rfqId: string }) {
     });
   }, [data, filter]);
 
-  function toggle(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  }
-
-  async function inviteSelected() {
-    if (selected.size === 0) {
-      setError("Selecciona al menos un proveedor.");
+  async function inviteAll() {
+    if (filtered.length === 0) {
+      setError("Ajusta los filtros: no hay proveedores que cumplan los criterios actuales.");
       return;
     }
     setInviting(true);
@@ -100,7 +83,7 @@ export function MatchingResults({ rfqId }: { rfqId: string }) {
       const res = await fetch(`/api/rfqs/${rfqId}/matching/invite`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ supplierOrgIds: Array.from(selected) }),
+        body: JSON.stringify({ supplierOrgIds: filtered.map((s) => s.id) }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -172,12 +155,12 @@ export function MatchingResults({ rfqId }: { rfqId: string }) {
           <div className="text-[12px] text-gray-400 mt-0.5">{data.rfq.title}</div>
         </div>
         <button
-          onClick={inviteSelected}
-          disabled={inviting || selected.size === 0}
+          onClick={inviteAll}
+          disabled={inviting || filtered.length === 0}
           className="flex items-center gap-1.5 bg-[#C9A227] text-[#0F1B2E] text-[13px] font-semibold px-4 py-2 rounded-lg hover:bg-[#B8911F] transition-colors duration-150 disabled:opacity-50"
         >
           <Sparkles size={14} />
-          {inviting ? "Enviando…" : `Invitar automáticamente (${selected.size})`}
+          {inviting ? "Enviando…" : `Invitar automáticamente a ${filtered.length}`}
         </button>
       </div>
 
@@ -211,6 +194,13 @@ export function MatchingResults({ rfqId }: { rfqId: string }) {
           </div>
         </div>
 
+        <div className="rounded-lg bg-[#C9A227]/[0.06] border border-[#C9A227]/20 px-4 py-3 mb-5 flex items-start gap-2 text-[12.5px] text-[#0F1B2E]">
+          <Lock size={13} className="mt-0.5 text-[#C9A227] shrink-0" />
+          <div>
+            BidMe elige a quién invitar automáticamente. Usa los filtros para acotar los criterios — no puedes elegir empresas individuales, para garantizar la equidad del proceso y proteger la confidencialidad del sistema.
+          </div>
+        </div>
+
         <div className="flex flex-wrap gap-1.5 mb-5">
           {filters.map((f) => (
             <button
@@ -230,67 +220,53 @@ export function MatchingResults({ rfqId }: { rfqId: string }) {
         <div className="space-y-2.5">
           {filtered.length === 0 && (
             <div className="text-[13px] text-gray-400 text-center py-10">
-              Ningún proveedor coincide con este filtro.
+              Ningún proveedor coincide con este filtro. Ajusta los criterios.
             </div>
           )}
-          {filtered.map((s) => {
-            const isSelected = selected.has(s.id);
-            return (
-              <div
-                key={s.id}
-                onClick={() => toggle(s.id)}
-                className={`rounded-xl border bg-white p-4 flex items-center gap-4 cursor-pointer transition-all duration-150 ${
-                  isSelected ? "border-[#C9A227]/60 shadow-sm" : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => toggle(s.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="h-4 w-4 accent-[#C9A227] shrink-0"
-                />
+          {filtered.map((s) => (
+            <div
+              key={s.id}
+              className="rounded-xl border border-gray-200 bg-white p-4 flex items-center gap-4"
+            >
+              <div className="h-9 w-9 rounded-full bg-[#0F1B2E]/5 flex items-center justify-center text-[12px] font-medium text-[#0F1B2E] shrink-0">
+                {s.name.slice(0, 2).toUpperCase()}
+              </div>
 
-                <div className="h-9 w-9 rounded-full bg-[#0F1B2E]/5 flex items-center justify-center text-[12px] font-medium text-[#0F1B2E] shrink-0">
-                  {s.name.slice(0, 2).toUpperCase()}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium text-gray-900 text-[13.5px]">{s.name}</span>
+                  {s.verified && <Check size={12} className="text-emerald-500" />}
+                  {s.isPremium && (
+                    <span className="flex items-center gap-0.5 text-[10px] font-semibold bg-[#C9A227]/10 text-[#8a6d15] rounded-full px-2 py-0.5">
+                      <Crown size={9} /> PREMIUM
+                    </span>
+                  )}
+                  {s.coverageNational && (
+                    <span className="flex items-center gap-0.5 text-[10px] text-gray-500">
+                      <Globe size={9} /> Nacional
+                    </span>
+                  )}
                 </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-gray-900 text-[13.5px]">{s.name}</span>
-                    {s.verified && <Check size={12} className="text-emerald-500" />}
-                    {s.isPremium && (
-                      <span className="flex items-center gap-0.5 text-[10px] font-semibold bg-[#C9A227]/10 text-[#8a6d15] rounded-full px-2 py-0.5">
-                        <Crown size={9} /> PREMIUM
-                      </span>
-                    )}
-                    {s.coverageNational && (
-                      <span className="flex items-center gap-0.5 text-[10px] text-gray-500">
-                        <Globe size={9} /> Nacional
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 mt-1 text-[11.5px] text-gray-400">
-                    <span>{s.category}</span>
-                    <span className="flex items-center gap-0.5"><MapPin size={10} /> {s.city}</span>
-                    <span className="truncate">{s.reasons.join(" · ")}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 shrink-0">
-                  <span className={`text-[11px] px-2 py-0.5 rounded-full border ${TIER_STYLES[s.tier]}`}>
-                    {TIER_LABELS[s.tier]}
-                  </span>
-                  <div className="w-14 text-right">
-                    <div className={`text-[17px] font-semibold ${s.score >= 70 ? "text-emerald-600" : s.score >= 40 ? "text-amber-600" : "text-gray-400"}`}>
-                      {s.score}
-                    </div>
-                    <div className="text-[9.5px] text-gray-400 uppercase tracking-wide">score</div>
-                  </div>
+                <div className="flex items-center gap-3 mt-1 text-[11.5px] text-gray-400">
+                  <span>{s.category}</span>
+                  <span className="flex items-center gap-0.5"><MapPin size={10} /> {s.city}</span>
+                  <span className="truncate">{s.reasons.join(" · ")}</span>
                 </div>
               </div>
-            );
-          })}
+
+              <div className="flex items-center gap-3 shrink-0">
+                <span className={`text-[11px] px-2 py-0.5 rounded-full border ${TIER_STYLES[s.tier]}`}>
+                  {TIER_LABELS[s.tier]}
+                </span>
+                <div className="w-14 text-right">
+                  <div className={`text-[17px] font-semibold ${s.score >= 70 ? "text-emerald-600" : s.score >= 40 ? "text-amber-600" : "text-gray-400"}`}>
+                    {s.score}
+                  </div>
+                  <div className="text-[9.5px] text-gray-400 uppercase tracking-wide">score</div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
