@@ -4,7 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronRight, Check, Paperclip, Calendar, Radar, Sparkles, Lock } from "lucide-react";
 
-const CATEGORIES = ["Tecnología", "SAP", "Ciberseguridad", "Construcción", "Transporte", "Mantenimiento", "Limpieza", "Seguridad"];
+const CATEGORIES = [
+  "Tecnología", "SAP", "Ciberseguridad", "Construcción", "Transporte",
+  "Mantenimiento", "Limpieza", "Seguridad",
+  "Agroindustria", "Alimentos", "Automotriz", "Banca y Finanzas",
+  "Bienes Raíces", "Comercio y Retail", "Consultoría", "Educación",
+  "Energía", "Gobierno", "Hotelería y Turismo", "Legal",
+  "Marketing y Comunicación", "Salud", "Seguros", "Otros",
+];
 
 const SUBCATEGORIES: Record<string, string[]> = {
   "Tecnología": ["Computadoras", "Redes", "Software", "Impresión"],
