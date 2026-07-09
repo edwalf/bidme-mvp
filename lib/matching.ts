@@ -133,11 +133,15 @@ export async function findBestSuppliers(rfq: Rfq): Promise<ScoredSupplier[]> {
 
   return candidates
     .filter((s) => !invitedIds.has(s.id))
+    // FILTRO DURO: solo consideramos proveedores cuya categoría coincide
+    // con la del RFQ. Sin esto, todo proveedor con oficina en la misma
+    // ciudad se cuela con un score bajo pero visible — lo que reintroduce
+    // ruido y traiciona la promesa "encontramos a los correctos".
+    .filter((s) => s.mainCategory === rfq.category || s.categories.includes(rfq.category))
     .map((supplier) => {
       const { score, reasons, breakdown } = calculateSupplierScore(supplier, rfq);
       return { supplier, score, tier: tierOf(score), reasons, breakdown };
     })
-    .filter((s) => s.score > 0)
     .sort((a, b) => b.score - a.score);
 }
 
