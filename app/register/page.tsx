@@ -5,7 +5,14 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 
-const CATEGORIES = ["Tecnología", "SAP", "Ciberseguridad", "Construcción", "Transporte", "Mantenimiento", "Limpieza", "Seguridad"];
+const CATEGORIES = [
+  "Tecnología", "SAP", "Ciberseguridad", "Construcción", "Transporte",
+  "Mantenimiento", "Limpieza", "Seguridad",
+  "Agroindustria", "Alimentos", "Automotriz", "Banca y Finanzas",
+  "Bienes Raíces", "Comercio y Retail", "Consultoría", "Educación",
+  "Energía", "Gobierno", "Hotelería y Turismo", "Legal",
+  "Marketing y Comunicación", "Salud", "Seguros", "Otros",
+];
 
 export default function RegisterPage() {
   const router = useRouter();

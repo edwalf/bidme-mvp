@@ -11,7 +11,8 @@
     "prisma:studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
     "bootstrap": "tsx prisma/bootstrap.ts",
-    "load-companies": "tsx prisma/loadCompanies.ts"
+    "load-companies": "tsx prisma/loadCompanies.ts",
+    "reclassify": "tsx prisma/reclassify.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.20.0",
