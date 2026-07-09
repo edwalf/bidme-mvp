@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { Plus, MapPin } from "lucide-react";
+import { Plus, MapPin, Send, Users, MessageSquare, Trophy, Check } from "lucide-react";
 
 const STATUS_STYLES: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-500 border-gray-200",
@@ -30,20 +30,9 @@ export default async function BuyerDashboard() {
     orderBy: { createdAt: "desc" },
   });
 
-  // Empresas activas en la red — dato real, no simulado.
-  const networkSize = await prisma.organization.count({
-    where: { type: { in: ["SUPPLIER", "BOTH"] }, active: true },
-  });
-
   const activeCount = rfqs.filter((r) => r.status === "PUBLISHED").length;
   const totalProposals = rfqs.reduce((sum, r) => sum + r.invitations.filter((i) => i.proposal).length, 0);
   const totalInvited = rfqs.reduce((sum, r) => sum + r.invitations.length, 0);
-
-  // Tiempo estimado ahorrado: buscar y contactar proveedores manualmente
-  // toma ~7 horas por solicitud según benchmarks internos de procurement.
-  // Es un cálculo, no un dato falso: cada RFQ que BidMe procesó = 7 horas
-  // que el comprador no tuvo que dedicar.
-  const hoursSaved = rfqs.length * 7;
 
   return (
     <div>
@@ -55,122 +44,151 @@ export default async function BuyerDashboard() {
       </div>
 
       <div className="px-8 py-6">
-        {/* Hero: propuesta de valor + red viva. Es lo primero que ve un cliente
-            que entra al producto — comunica el "por qué" antes que los "qué". */}
-        <div className="rounded-2xl bg-gradient-to-br from-[#0F1B2E] via-[#152540] to-[#1a2d4f] text-white p-8 mb-6 relative overflow-hidden">
-          {/* Detalle sutil en el fondo — solo textura, no distrae */}
-          <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-[#C9A227]/10 blur-3xl" />
-          <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-[#C9A227]/5 blur-3xl" />
-
-          <div className="relative">
-            <div className="text-[11.5px] uppercase tracking-[0.15em] text-[#C9A227] font-medium mb-2.5">
-              BidMe · Smart Procurement
-            </div>
-            <h2 className="text-[26px] leading-tight font-semibold max-w-2xl tracking-tight">
-              Encontramos automáticamente a los proveedores correctos para cada solicitud.
-            </h2>
-            <div className="text-[13px] text-white/60 mt-2 max-w-2xl">
-              Sin buscar proveedores, sin cotizar solo con los mismos de siempre, sin depender de contactos personales.
-            </div>
-
-            <div className="flex flex-wrap gap-6 mt-6 pt-6 border-t border-white/10">
-              <div>
-                <div className="text-[24px] font-semibold tracking-tight">{networkSize.toLocaleString()}</div>
-                <div className="text-[11.5px] text-white/50 mt-0.5">empresas en la red</div>
-              </div>
-              <div className="h-10 w-px bg-white/10 self-center" />
-              <div>
-                <div className="text-[24px] font-semibold tracking-tight">segundos</div>
-                <div className="text-[11.5px] text-white/50 mt-0.5">para encontrar proveedores</div>
-              </div>
-              <div className="h-10 w-px bg-white/10 self-center" />
-              <div>
-                <div className="text-[24px] font-semibold tracking-tight text-[#C9A227]">privado</div>
-                <div className="text-[11.5px] text-white/50 mt-0.5">ningún proveedor sabe quién más participa</div>
-              </div>
-            </div>
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="text-[12px] text-gray-500">Solicitudes activas</div>
+            <div className="text-[24px] font-semibold text-gray-900 mt-1">{activeCount}</div>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="text-[12px] text-gray-500">Cotizaciones recibidas</div>
+            <div className="text-[24px] font-semibold text-gray-900 mt-1">{totalProposals}</div>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="text-[12px] text-gray-500">Proveedores invitados (total)</div>
+            <div className="text-[24px] font-semibold text-gray-900 mt-1">{totalInvited}</div>
           </div>
         </div>
 
-        {/* Métricas del comprador — ahora en la posición secundaria, con narrativa */}
-        <div className="grid grid-cols-4 gap-3 mb-6">
-          <div className="rounded-xl border border-gray-200 bg-white p-4">
-            <div className="text-[11.5px] text-gray-500 uppercase tracking-wide">Activas</div>
-            <div className="text-[22px] font-semibold text-gray-900 mt-1">{activeCount}</div>
-            <div className="text-[11px] text-gray-400 mt-0.5">solicitudes en curso</div>
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[13px] font-medium text-gray-700">Tus solicitudes</div>
+            <div className="text-[11.5px] text-gray-400">{rfqs.length} en total</div>
           </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-4">
-            <div className="text-[11.5px] text-gray-500 uppercase tracking-wide">Cotizaciones</div>
-            <div className="text-[22px] font-semibold text-gray-900 mt-1">{totalProposals}</div>
-            <div className="text-[11px] text-gray-400 mt-0.5">recibidas privadamente</div>
-          </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-4">
-            <div className="text-[11.5px] text-gray-500 uppercase tracking-wide">Proveedores</div>
-            <div className="text-[22px] font-semibold text-gray-900 mt-1">{totalInvited}</div>
-            <div className="text-[11px] text-gray-400 mt-0.5">seleccionados por el motor</div>
-          </div>
-          <div className="rounded-xl border border-[#C9A227]/30 bg-[#C9A227]/[0.04] p-4">
-            <div className="text-[11.5px] text-[#8a6d15] uppercase tracking-wide">Tiempo ahorrado</div>
-            <div className="text-[22px] font-semibold text-[#0F1B2E] mt-1">~{hoursSaved}h</div>
-            <div className="text-[11px] text-gray-500 mt-0.5">vs. búsqueda manual</div>
-          </div>
-        </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-gray-100 text-[13px] font-medium text-gray-700">
-            Tus solicitudes
-          </div>
           {rfqs.length === 0 ? (
-            <div className="px-5 py-10 text-center text-[13px] text-gray-400">
-              Aún no tienes solicitudes. Crea la primera en menos de 2 minutos.
+            <div className="rounded-xl border border-dashed border-gray-200 bg-white px-5 py-14 text-center">
+              <div className="text-[14px] text-gray-500 font-medium">Aún no tienes solicitudes.</div>
+              <div className="text-[12.5px] text-gray-400 mt-1 mb-4">Publica la primera y verás el motor de matching en acción en menos de 5 segundos.</div>
+              <Link
+                href="/buyer/requests/new"
+                className="inline-flex items-center gap-1.5 bg-[#C9A227] text-[#0F1B2E] text-[12.5px] font-semibold px-3.5 py-1.5 rounded-lg hover:bg-[#B8911F]"
+              >
+                <Plus size={14} /> Nueva Solicitud
+              </Link>
             </div>
           ) : (
-            <table className="w-full text-[13px]">
-              <thead>
-                <tr className="text-left text-gray-400 text-[11.5px] uppercase tracking-wide">
-                  <th className="px-5 py-2.5 font-medium">Título</th>
-                  <th className="px-5 py-2.5 font-medium">Categoría</th>
-                  <th className="px-5 py-2.5 font-medium">Ciudad</th>
-                  <th className="px-5 py-2.5 font-medium">Cotizaciones</th>
-                  <th className="px-5 py-2.5 font-medium">Estado</th>
-                  <th className="px-5 py-2.5 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {rfqs.map((r) => (
-                  <tr key={r.id} className="border-t border-gray-50 hover:bg-gray-50/60 transition-colors duration-150">
-                    <td className="px-5 py-3 text-gray-900 font-medium">{r.title}</td>
-                    <td className="px-5 py-3 text-gray-500">{r.category}</td>
-                    <td className="px-5 py-3 text-gray-500 flex items-center gap-1">
-                      <MapPin size={12} /> {r.city}
-                    </td>
-                    <td className="px-5 py-3 text-gray-500">
-                      {r.invitations.filter((i) => i.proposal).length}
-                    </td>
-                    <td className="px-5 py-3">
-                      <span className={`text-[11px] px-2 py-0.5 rounded-full border ${STATUS_STYLES[r.status]}`}>
-                        {STATUS_LABELS[r.status]}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      {r.status === "DRAFT" ? (
-                        <Link href="/buyer/requests/new" className="text-[#C9A227] font-medium text-[12.5px]">
-                          Continuar
-                        </Link>
-                      ) : r.status === "MATCHING" ? (
-                        <Link href={`/buyer/requests/${r.id}/matching`} className="text-[#C9A227] font-medium text-[12.5px]">
-                          Revisar matching
-                        </Link>
-                      ) : (
-                        <Link href={`/buyer/requests/${r.id}/compare`} className="text-[#C9A227] font-medium text-[12.5px]">
-                          Ver comparador
-                        </Link>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="grid gap-3">
+              {rfqs.map((r) => {
+                const invited = r.invitations.length;
+                const responded = r.invitations.filter((i) => i.status !== "PENDING").length;
+                const proposals = r.invitations.filter((i) => i.proposal).length;
+                const awarded = r.status === "CLOSED";
+
+                // Los 4 hitos del ciclo de vida de un RFQ. Cada uno se pinta
+                // "completado" o "pendiente" según el estado real del RFQ —
+                // el usuario ve exactamente en qué punto está su proceso.
+                const steps = [
+                  { icon: Send, label: "Publicada", done: r.status !== "DRAFT" },
+                  { icon: Users, label: `${invited} invitados`, done: invited > 0 },
+                  { icon: MessageSquare, label: `${proposals} cotizaron`, done: proposals > 0 },
+                  { icon: Trophy, label: "Adjudicada", done: awarded },
+                ];
+
+                const cta =
+                  r.status === "DRAFT"
+                    ? { href: "/buyer/requests/new", label: "Continuar edición" }
+                    : r.status === "MATCHING"
+                    ? { href: `/buyer/requests/${r.id}/matching`, label: "Revisar matching →" }
+                    : { href: `/buyer/requests/${r.id}/compare`, label: awarded ? "Ver resultado →" : "Ver cotizaciones →" };
+
+                return (
+                  <Link
+                    key={r.id}
+                    href={cta.href}
+                    className="group block rounded-xl border border-gray-200 bg-white p-5 hover:border-[#C9A227]/40 hover:shadow-[0_2px_20px_rgba(15,27,46,0.06)] transition-all duration-200"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-[15px] font-semibold text-gray-900 tracking-tight truncate">{r.title}</h3>
+                          <span className={`text-[10.5px] px-2 py-0.5 rounded-full border ${STATUS_STYLES[r.status]}`}>
+                            {STATUS_LABELS[r.status]}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-[12px] text-gray-500">
+                          <span>{r.category}</span>
+                          <span className="text-gray-300">·</span>
+                          <span className="flex items-center gap-1"><MapPin size={11} /> {r.city}</span>
+                          <span className="text-gray-300">·</span>
+                          <span>{new Date(r.createdAt).toLocaleDateString("es-GT", { day: "numeric", month: "short" })}</span>
+                        </div>
+                      </div>
+                      <div className="text-[12.5px] font-medium text-[#C9A227] group-hover:translate-x-0.5 transition-transform shrink-0">
+                        {cta.label}
+                      </div>
+                    </div>
+
+                    {/* Stepper visual del flujo de la solicitud. Cada punto
+                        se llena en dorado cuando ese hito se cumplió. */}
+                    <div className="mt-5 flex items-center gap-1">
+                      {steps.map((s, i) => {
+                        const Icon = s.done ? Check : s.icon;
+                        return (
+                          <div key={i} className="flex items-center flex-1 last:flex-none">
+                            <div className="flex items-center gap-2 shrink-0">
+                              <div
+                                className={`h-7 w-7 rounded-full flex items-center justify-center border transition-colors ${
+                                  s.done
+                                    ? "bg-[#C9A227] border-[#C9A227] text-[#0F1B2E]"
+                                    : "bg-white border-gray-200 text-gray-400"
+                                }`}
+                              >
+                                <Icon size={13} strokeWidth={2.2} />
+                              </div>
+                              <span className={`text-[11.5px] ${s.done ? "text-gray-700 font-medium" : "text-gray-400"}`}>
+                                {s.label}
+                              </span>
+                            </div>
+                            {i < steps.length - 1 && (
+                              <div className={`h-px flex-1 mx-2 ${s.done ? "bg-[#C9A227]/40" : "bg-gray-200"}`} />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Cambio C: cuando está esperando propuestas, mostrar un
+                        aviso que comunique "el sistema está trabajando por ti"
+                        en vez de un frío "0 cotizaciones". */}
+                    {r.status === "PUBLISHED" && proposals === 0 && (
+                      <div className="mt-4 flex items-center gap-2 text-[11.5px] text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        <span>
+                          Esperando respuestas · fecha límite {new Date(r.deadline).toLocaleDateString("es-GT", { day: "numeric", month: "long" })} · te notificaremos en cuanto llegue la primera propuesta
+                        </span>
+                      </div>
+                    )}
+                    {r.status === "PUBLISHED" && proposals > 0 && (
+                      <div className="mt-4 flex items-center gap-2 text-[11.5px] text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">
+                        <MessageSquare size={12} />
+                        <span>
+                          {proposals} propuesta{proposals === 1 ? "" : "s"} lista{proposals === 1 ? "" : "s"} para comparar
+                        </span>
+                      </div>
+                    )}
+                    {r.status === "CLOSED" && (
+                      <div className="mt-4 flex items-center gap-2 text-[11.5px] text-[#8a6d15] bg-[#C9A227]/10 rounded-lg px-3 py-2">
+                        <Trophy size={12} />
+                        <span>Solicitud adjudicada — los proveedores no ganadores fueron notificados sin conocer el precio ganador.</span>
+                      </div>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
